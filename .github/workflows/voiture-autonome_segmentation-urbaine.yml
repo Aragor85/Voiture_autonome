@@ -3,7 +3,7 @@ name: Deploy segmentation-urbaine to Azure via ACR
 on:
   push:
     branches:
-      - voiture-autonome  # Remplace par le nom réel de ta branche si nécessaire
+      - voiture-autonome  
   workflow_dispatch:
 
 env:
