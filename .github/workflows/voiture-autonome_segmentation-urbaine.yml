@@ -28,6 +28,11 @@ jobs:
       - name: Azure Container Registry Login
         run: az acr login --name ${{ env.ACR_NAME }}
 
+      - name: Disable BuildKit
+        run: |
+          echo '{"features":{"buildkit":false}}' | sudo tee /etc/docker/daemon.json
+          sudo systemctl restart docker
+
       - name: Build Docker image
         run: |
           docker build . -t ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest
