@@ -1,4 +1,4 @@
-@'
+
 FROM python:3.10-slim
 
 WORKDIR /app
@@ -22,4 +22,3 @@ RUN chmod +x start.sh
 EXPOSE 80
 
 CMD ["./start.sh"]
-'@ | Out-File -FilePath Dockerfile -Encoding utf8
