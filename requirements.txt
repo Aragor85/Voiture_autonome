@@ -1,5 +1,7 @@
-fastapi==0.103.0
+fastapi
 uvicorn[standard]
+gunicorn       
+streamlit
 tensorflow==2.16.1
 keras==3.0.5
 numpy
@@ -7,4 +9,3 @@ matplotlib
 pillow
 python-multipart
 scikit-image
-streamlit
