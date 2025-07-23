@@ -11,45 +11,40 @@ env:
   ACR_LOGIN_SERVER: voitureautonome.azurecr.io
   IMAGE_NAME: segmentation-urbaine-app
   WEBAPP_NAME: segmentation-urbaine
+  # Désactive BuildKit pour éviter les RST_STREAM INTERNAL_ERROR
+  DOCKER_BUILDKIT: 0
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Récupère le code
+      # 1) Récupère le code
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. Login Azure via SPN stocké dans AZURE_CREDENTIALS
+      # 2) Auth Azure via SPN
       - name: Azure Login
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # 3. Login ACR
+      # 3) Auth à l’ACR
       - name: Azure Container Registry Login
         run: az acr login --name ${{ env.ACR_NAME }}
 
-      # 4. Désactive BuildKit (résout le RST_STREAM INTERNAL_ERROR)
-      - name: Disable BuildKit
+      # 4) Build & push avec Docker  
+      - name: Build, tag and push image
         run: |
-          echo '{"features":{"buildkit":false}}' | sudo tee /etc/docker/daemon.json
-          sudo systemctl restart docker
-
-      # 5. Construis l’image Docker
-      - name: Build Docker image
-        run: |
-          docker build . \
+          # Construction de l'image
+          docker build \
             --file ./Dockerfile \
-            --tag ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest
-
-      # 6. Pousse l’image sur ACR
-      - name: Push Docker image to ACR
-        run: |
+            --tag ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest \
+            .
+          # Push vers ACR
           docker push ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest
 
-      # 7. Déploie sur Azure App Service en mode conteneur
+      # 5) Déploye sur Azure App Service en conteneur
       - name: Deploy to Azure Web App (via ACR)
         uses: azure/webapps-deploy@v3
         with:
