@@ -39,7 +39,7 @@ uploaded_file = st.file_uploader("📤 Téléversez une image (jpg/png)", type=[
 
 if uploaded_file:
     image = Image.open(uploaded_file).convert("RGB")
-    st.image(image, caption="🖼️ Image importée", use_column_width=True)
+    st.image(image, caption="🖼️ Image importée", use_container_width=True)
 
     # ── Nouveauté : boucle de retry pour attendre que l'API soit UP ──
     max_wait = 30

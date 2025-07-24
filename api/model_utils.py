@@ -17,7 +17,8 @@ from api.losses_and_metrics import (
 
 
 # ✅ Chemin du modèle
-MODEL_PATH = "model/unet_vgg16_best.h5"
+MODEL_PATH = os.path.join(os.path.dirname(__file__), "model", "unet_vgg16_best.h5")
+MODEL_PATH = os.path.abspath(MODEL_PATH)
 
 # ✅ Dictionnaire de custom_objects
 CUSTOM_OBJECTS = {
