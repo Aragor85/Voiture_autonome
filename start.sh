@@ -1,13 +1,23 @@
 #!/bin/bash
-set -eux  # -e: exit on error, -u: unset var → err, -x: echo cmds
+set -eux  # -e: exit on error, -u: unset var→err, -x: echo cmds
 
-# 1. FastAPI sur toutes les interfaces, port 8000
+# 1. Démarrer FastAPI (Uvicorn) en arrière-plan sur toutes les interfaces
 uvicorn api.main:app --host 0.0.0.0 --port 8000 &
 
-# 2. API_URL pour Streamlit
-export API_URL="http://127.0.0.1:8000"
+# 2. Définit l'URL que Streamlit utilisera
+export API_URL="http://localhost:8000"
 
-# 3. Streamlit en PID 1 sur le port 80
+# 3. Attendre que l'API soit joinable (max 30s)
+echo " Attente de l'API sur localhost:8000…"
+for i in {1..30}; do
+  if nc -z localhost 8000; then
+    echo " API prête après $i secondes"
+    break
+  fi
+  sleep 1
+done
+
+# 4. Lancer Streamlit sur le port 80 (PID 1)
 exec streamlit run app/streamlit_app.py \
      --server.address 0.0.0.0 \
      --server.port 80
