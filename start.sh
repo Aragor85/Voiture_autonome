@@ -1,11 +1,11 @@
 #!/bin/bash
-set -ex
+set -eux  # -e : exit on error, -u : error on unset vars, -x : log commands
 
-# 1. Démarrage de FastAPI en arrière-plan sur 127.0.0.1:8000
+# 1. Démarrage de FastAPI avec Uvicorn sur 127.0.0.1:8000
 uvicorn app.main:app --host 127.0.0.1 --port 8000 &
 
 # 2. Exporter l'URL pour Streamlit
 export API_URL="http://127.0.0.1:8000"
 
-# 3. Démarrage de Streamlit au premier plan sur le port 80
-streamlit run streamlit_app/app.py --server.address 0.0.0.0 --server.port 80
+# 3. Lancement de Streamlit sur le port 80
+streamlit run app/streamlit_app.py --server.address 0.0.0.0 --server.port 80
