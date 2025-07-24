@@ -7,13 +7,14 @@ import io
 import os
 
 # 📥 Fonctions custom à importer
-from losses_and_metrics import (
+from api.losses_and_metrics import (
     dice_metric,
     dice_loss_metric,
     cross_entropy_metric,
     total_loss,
     mean_iou
 )
+
 
 # ✅ Chemin du modèle
 MODEL_PATH = "model/unet_vgg16_best.h5"

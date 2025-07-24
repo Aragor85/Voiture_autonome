@@ -1,22 +1,22 @@
-FROM python:3.10-slim AS builder
+# Dockerfile
+
+FROM python:3.10
+
+# Définir le répertoire de travail
 WORKDIR /app
+
+# Copier les dossiers nécessaires
+COPY api/ /app/api/
+COPY api/model/ /app/model/      
+COPY app/ /app/app/
 COPY requirements.txt .
-RUN pip wheel --no-cache-dir -r requirements.txt -w /wheels
+COPY start.sh /app/start.sh
 
-FROM python:3.10-slim
-WORKDIR /app
+# Installer les dépendances
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Installer netcat pour le wait-loop
-RUN apt-get update \
- && apt-get install -y netcat-openbsd \
- && rm -rf /var/lib/apt/lists/*
+# Rendre le script exécutable
+RUN chmod +x /app/start.sh
 
-
-COPY --from=builder /wheels /wheels
-RUN pip install --no-cache-dir /wheels/*.whl
-
-COPY . .
-RUN chmod +x start.sh
-
-EXPOSE 80
-ENTRYPOINT ["./start.sh"]
+# Commande par défaut
+CMD ["./start.sh"]

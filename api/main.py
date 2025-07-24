@@ -1,7 +1,7 @@
 from fastapi import FastAPI, UploadFile, File
 from fastapi.responses import JSONResponse
 import uvicorn
-from model_utils import load_model_and_predict
+from api.model_utils import load_model_and_predict
 
 app = FastAPI()
 
