@@ -1,30 +1,18 @@
-#!/usr/bin/env bash
-set -e
+#!/bin/bash
+set -e  # Arrêter le script si une commande échoue
 
-# 🔧 Définition de l'URL de l'API
-export API_URL=${API_URL:-http://localhost:8000}
-echo "🕐 Attente de l'API sur ${API_URL}…"
+MODEL_PATH=/app/api/model/unet_vgg16_best.h5
+MODEL_URL="https://modelevgg16unetstorage.blob.core.windows.net/modelevgg16unetstorage/unet_vgg16_best.h5"
 
-# ── Lancement de l'API en arrière-plan
-uvicorn api.main:app --host 0.0.0.0 --port 8000 --log-level debug &
-API_PID=$!
-
-# ── Boucle de vérification de disponibilité de l'API
-max_wait=30
-for i in $(seq 1 $max_wait); do
-    if curl -sSf "${API_URL}/docs" > /dev/null; then
-        echo "✅ API prête après ${i} secondes"
-        break
-    fi
-    sleep 1
-done
-
-# ── Si l'API n'est pas prête, on affiche une erreur et on stoppe
-if ! curl -sSf "${API_URL}/docs" > /dev/null; then
-    echo "❌ L’API n’a pas répondu après ${max_wait} secondes. Abandon."
-    kill $API_PID
-    exit 1
+# Vérifier si le modèle existe déjà
+if [ ! -f "$MODEL_PATH" ]; then
+  echo "Modèle non trouvé, téléchargement en cours..."
+  curl -L -o "$MODEL_PATH" "$MODEL_URL"
+  echo "Téléchargement terminé."
+else
+  echo "Modèle déjà présent, pas de téléchargement."
 fi
 
-# ── Lancement de Streamlit au premier-plan (remplace le shell)
-exec streamlit run app/streamlit_app.py --server.address 0.0.0.0 --server.port 80
+# Lancer l'application FastAPI avec uvicorn
+echo "Démarrage de l'application..."
+uvicorn api.main:app --host 0.0.0.0 --port 8000
