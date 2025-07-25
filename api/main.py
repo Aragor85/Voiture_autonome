@@ -9,7 +9,6 @@ app = FastAPI(
     description="Endpoint de prédiction de masque pour Cityscapes",
 )
 
-# Autoriser l'accès depuis Streamlit localement
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -17,14 +16,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/")
+async def root():
+    return {"message": "API Segmentation Urbaine - En ligne"}
+
 @app.post("/predict/")
 async def predict_mask(file: UploadFile = File(...)):
-    # 1. Lecture des octets
     contents = await file.read()
     if not contents:
         raise HTTPException(status_code=400, detail="Fichier vide")
 
-    # 2. Vérification du format image
     try:
         img = Image.open(io.BytesIO(contents))
         img.verify()
@@ -33,7 +34,6 @@ async def predict_mask(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Erreur lors de la lecture de l'image : {e}")
 
-    # 3. Prédiction
     try:
         mask = load_model_and_predict(contents)
     except Exception as e:
