@@ -1,9 +1,10 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from api.model_utils import load_model_from_url, preprocess_image, predict
+from api.model_utils import load_model_from_url
 from PIL import Image
 import io
 import numpy as np
+import tensorflow as tf
 
 app = FastAPI()
 
@@ -15,8 +16,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Charger le modèle sans recompilation
+# Charger le modèle une fois au démarrage
 model = load_model_from_url()
+
+# Fonction de prétraitement simple (resize + normalisation)
+def preprocess_image(image: Image.Image) -> np.ndarray:
+    image = image.resize((224, 224))
+    img_array = np.array(image).astype("float32") / 255.0  # Normalisation
+    img_array = np.expand_dims(img_array, axis=0)  # Shape (1, 224, 224, 3)
+    return img_array
 
 @app.get("/")
 async def root():
@@ -34,9 +42,7 @@ async def predict_segmentation(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="Erreur lors du traitement de l'image")
 
     input_data = preprocess_image(image)
-    prediction = predict(model, input_data)  # shape: (1, H, W, num_classes)
-    mask = np.argmax(prediction.squeeze(), axis=-1).astype(np.uint8)  # shape: (H, W)
+    prediction = model.predict(input_data)  # Shape: (1, 224, 224, num_classes)
+    mask = np.argmax(prediction.squeeze(), axis=-1).astype(np.uint8)  # Shape: (224, 224)
 
-    # On renvoie le masque brut (pas superposé ici car API ne fait que traiter)
-    mask_list = mask.tolist()
-    return {"mask": mask_list}
+    return {"prediction": mask.tolist()}
