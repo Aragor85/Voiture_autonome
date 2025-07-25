@@ -1,55 +1,41 @@
-name: Build & Deploy segmentation-urbaine to Azure via ACR
+name: Build and Push Docker Image
 
 on:
   push:
     branches:
-      - voiture-autonome
-  workflow_dispatch:
+      - main  # adapte selon ta branche
 
 env:
-  ACR_NAME: voitureautonome
   ACR_LOGIN_SERVER: voitureautonome.azurecr.io
   IMAGE_NAME: segmentation-urbaine-app
-  WEBAPP_NAME: segmentation-urbaine
-  # Désactive BuildKit pour éviter les RST_STREAM INTERNAL_ERROR
-  DOCKER_BUILDKIT: 0
 
 jobs:
-  build-and-deploy:
+  build_and_push:
     runs-on: ubuntu-latest
 
     steps:
-      # 1) Récupère le code
-      - name: Checkout code
+      - name: Checkout repo
         uses: actions/checkout@v4
-        
-      - name: List files before build
-        run: ls -R
 
-      # 2) Auth Azure via SPN
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      # 3) Auth à l’ACR
-      - name: Azure Container Registry Login
-        run: az acr login --name ${{ env.ACR_NAME }}
-
-      # 4) Build & push avec Docker  
-      - name: Build, tag and push image
+      - name: List repo contents for debugging
         run: |
-          # Construction de l'image
-          docker build \
-            --file ./Dockerfile \
-            --tag ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest \
-            .
-          # Push vers ACR
-          docker push ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest
+          echo "Contenu racine :"
+          ls -l
+          echo "Contenu dossier app/:"
+          ls -lR app/
+          echo "Contenu dossier api/:"
+          ls -lR api/
 
-      # 5) Déploye sur Azure App Service en conteneur
-      - name: Deploy to Azure Web App (via ACR)
-        uses: azure/webapps-deploy@v3
+      - name: Log in to Azure Container Registry
+        uses: azure/docker-login@v1
         with:
-          app-name: ${{ env.WEBAPP_NAME }}
-          images: ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest
+          login-server: ${{ env.ACR_LOGIN_SERVER }}
+          username: ${{ secrets.ACR_USERNAME }}     # configure dans GitHub Secrets
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Build, tag and push Docker image
+        env:
+          DOCKER_BUILDKIT: 1
+        run: |
+          docker build --no-cache --file ./Dockerfile --tag $ACR_LOGIN_SERVER/$IMAGE_NAME:latest .
+          docker push $ACR_LOGIN_SERVER/$IMAGE_NAME:latest
