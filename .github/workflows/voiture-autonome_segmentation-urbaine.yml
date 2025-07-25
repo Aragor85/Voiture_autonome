@@ -1,50 +1,28 @@
-name: Build & Deploy segmentation-urbaine to Azure via ACR
-
-on:
-  push:
-    branches:
-      - voiture-autonome
-  workflow_dispatch:
-
-env:
-  ACR_NAME: voitureautonome
-  ACR_LOGIN_SERVER: voitureautonome.azurecr.io
-  IMAGE_NAME: segmentation-urbaine-app
-  WEBAPP_NAME: segmentation-urbaine
-  # Désactive BuildKit pour éviter les RST_STREAM INTERNAL_ERROR
-  DOCKER_BUILDKIT: 0
-
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 1) Récupère le code
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2) Auth Azure via SPN
       - name: Azure Login
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # 3) Auth à l’ACR
       - name: Azure Container Registry Login
         run: az acr login --name ${{ env.ACR_NAME }}
 
-      # 4) Build & push avec Docker  
       - name: Build, tag and push image
         run: |
-          # Construction de l'image
           docker build \
-            --file ./Dockerfile \
+            --file ./voiture_autonome/Dockerfile \
             --tag ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest \
-            .
-          # Push vers ACR
+            ./voiture_autonome
+
           docker push ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest
 
-      # 5) Déploye sur Azure App Service en conteneur
       - name: Deploy to Azure Web App (via ACR)
         uses: azure/webapps-deploy@v3
         with:
