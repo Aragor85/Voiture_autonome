@@ -2,7 +2,6 @@ import threading
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api.main import app as fastapi_app
 import streamlit.web.bootstrap
 import os
 
