@@ -36,14 +36,16 @@ CUSTOM_OBJECTS = {
     "mean_iou": mean_iou
 }
 
-# Chargement du modèle avec le contexte custom
-if not os.path.exists(MODEL_PATH):
-    raise FileNotFoundError(f"Modèle introuvable à l'emplacement : {MODEL_PATH}")
+# ✅ Chargement du modèle avec détection d’erreurs
+try:
+    with custom_object_scope(CUSTOM_OBJECTS):
+        model = load_model(MODEL_PATH, compile=False)
+    print("[DEBUG] ✅ Modèle chargé avec succès")
+except Exception as e:
+    print(f"[ERROR] ❌ Échec du chargement du modèle : {type(e).__name__} - {e}")
+    raise
 
-with custom_object_scope(CUSTOM_OBJECTS):
-    model = load_model(MODEL_PATH, compile=False)
-
-
+# ✅ Fonction de prédiction
 def load_model_and_predict(image_file):
     """
     Prend une image binaire et retourne le masque prédit.
