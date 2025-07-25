@@ -39,3 +39,5 @@ jobs:
         run: |
           docker build --no-cache --file ./Dockerfile --tag $ACR_LOGIN_SERVER/$IMAGE_NAME:latest .
           docker push $ACR_LOGIN_SERVER/$IMAGE_NAME:latest
+
+
