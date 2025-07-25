@@ -1,6 +1,7 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from api.model_utils import load_model_from_url, preprocess_image, predictfrom PIL import Image
+from api.model_utils import load_model_from_url, preprocess_image, predict
+from PIL import Image
 import io
 
 app = FastAPI()
