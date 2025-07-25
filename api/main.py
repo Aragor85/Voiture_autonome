@@ -20,6 +20,10 @@ app.add_middleware(
 async def root():
     return {"message": "API Segmentation Urbaine - En ligne"}
 
+@app.get("/health")
+async def health_check():
+    return {"status": "ok"}
+
 @app.post("/predict/")
 async def predict_mask(file: UploadFile = File(...)):
     contents = await file.read()
