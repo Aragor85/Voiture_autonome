@@ -1,15 +1,42 @@
-from fastapi import FastAPI, UploadFile, File
-from fastapi.responses import JSONResponse
-import uvicorn
+from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+import io
+from PIL import Image, UnidentifiedImageError
 from api.model_utils import load_model_and_predict
 
-app = FastAPI()
+app = FastAPI(
+    title="Segmentation Urbaine API",
+    description="Endpoint de prédiction de masque pour Cityscapes",
+)
+
+# Autoriser l'accès depuis Streamlit localement
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.post("/predict/")
 async def predict_mask(file: UploadFile = File(...)):
-    image_bytes = await file.read()
-    prediction = load_model_and_predict(image_bytes)
-    return JSONResponse(content={"prediction": prediction.tolist()})
+    # 1. Lecture des octets
+    contents = await file.read()
+    if not contents:
+        raise HTTPException(status_code=400, detail="Fichier vide")
 
-if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    # 2. Vérification du format image
+    try:
+        img = Image.open(io.BytesIO(contents))
+        img.verify()
+    except UnidentifiedImageError:
+        raise HTTPException(status_code=415, detail="Le fichier envoyé n'est pas une image valide")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Erreur lors de la lecture de l'image : {e}")
+
+    # 3. Prédiction
+    try:
+        mask = load_model_and_predict(contents)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur interne lors de la prédiction : {e}")
+
+    return {"prediction": mask.tolist()}

@@ -15,10 +15,17 @@ from api.losses_and_metrics import (
     mean_iou
 )
 
-
-# ✅ Chemin du modèle
-MODEL_PATH = os.path.join(os.path.dirname(__file__), "model", "unet_vgg16_best.h5")
+# ✅ Chemin du modèle: priorise la variable d'environnement MODEL_PATH
+env_model_path = os.getenv("MODEL_PATH")
+if env_model_path:
+    MODEL_PATH = env_model_path
+else:
+    MODEL_PATH = os.path.join(os.path.dirname(__file__), "model", "unet_vgg16_best.h5")
 MODEL_PATH = os.path.abspath(MODEL_PATH)
+
+# 🔍 Debug: afficher et vérifier la présence du fichier
+print(f"[DEBUG] MODEL_PATH = {MODEL_PATH}")
+print(f"[DEBUG] Exists? {os.path.isfile(MODEL_PATH)}")
 
 # ✅ Dictionnaire de custom_objects
 CUSTOM_OBJECTS = {
@@ -29,7 +36,7 @@ CUSTOM_OBJECTS = {
     "mean_iou": mean_iou
 }
 
-# ✅ Chargement du modèle avec le contexte custom
+# Chargement du modèle avec le contexte custom
 if not os.path.exists(MODEL_PATH):
     raise FileNotFoundError(f"Modèle introuvable à l'emplacement : {MODEL_PATH}")
 

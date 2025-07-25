@@ -34,31 +34,20 @@ st.set_page_config(layout="wide")
 st.title("🚘 FUTURE VISION TRANSPORT - Segmentation Urbaine - Voiture Autonome")
 
 API_URL = os.getenv("API_URL", "http://localhost:8000")
+
 uploaded_file = st.file_uploader("📤 Téléversez une image (jpg/png)", type=["jpg", "png", "jpeg"])
 
 if uploaded_file:
-    # Lecture et reset du buffer
-    uploaded_file.seek(0)
-    img_bytes = uploaded_file.read()
+    image = Image.open(uploaded_file).convert("RGB")
+    st.image(image, caption="🖼️ Image importée", use_container_width=True)
 
-    # Affichage de l'image originale
-    try:
-        image = Image.open(io.BytesIO(img_bytes)).convert("RGB")
-        st.image(image, caption="🖼️ Image importée", use_container_width=True)
-    except Exception as e:
-        st.error(f"Erreur lecture image : {e}")
-        st.stop()
-
-    # Boucle de retry pour attendre l'API
+    # ── Nouveauté : boucle de retry pour attendre que l'API soit UP ──
     max_wait = 30
-    for i in range(1, max_wait + 1):
-        ext = uploaded_file.name.split('.')[-1].lower()
-        mime = 'image/png' if ext == 'png' else 'image/jpeg'
-        files = {"file": (uploaded_file.name, img_bytes, mime)}
+    for i in range(max_wait):
         try:
             response = requests.post(
                 f"{API_URL}/predict/",
-                files=files,
+                files={"file": (uploaded_file.name, uploaded_file, uploaded_file.type)},
                 timeout=5
             )
             response.raise_for_status()
@@ -69,13 +58,8 @@ if uploaded_file:
         st.error(f"❌ L’API n’a pas répondu après {max_wait} secondes.")
         st.stop()
 
-    # Traitement du résultat
-    try:
-        pred_array = np.array(response.json()["prediction"], dtype=np.uint8)
-    except Exception as e:
-        st.error(f"Réponse API invalide : {e}")
-        st.stop()
-
+    # ── Traitement du résultat ──
+    pred_array = np.array(response.json()["prediction"], dtype=np.uint8)
     color_mask = np.zeros((224, 224, 3), dtype=np.uint8)
     for class_id, color in enumerate(cityscapes_palette):
         color_mask[pred_array == class_id] = color
