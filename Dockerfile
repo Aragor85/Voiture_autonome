@@ -10,10 +10,12 @@ COPY start.sh .
 # Installer les dépendances Python sans cache
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copier tous les fichiers nécessaires
+# Copier le code source
 COPY api/ ./api/
 COPY app/ ./app/
-COPY api/model/unet_vgg16_best.h5 ./api/model/unet_vgg16_best.h5
+
+# Télécharger le fichier du modèle depuis Azure Blob Storage
+RUN curl -o ./api/model/unet_vgg16_best.h5 https://modelevgg16unetstorage.blob.core.windows.net/modelevgg16unetstorage/unet_vgg16_best.h5
 
 # Rendre le script de démarrage exécutable
 RUN chmod +x start.sh
