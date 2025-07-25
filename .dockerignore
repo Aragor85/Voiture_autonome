@@ -1,32 +1,10 @@
-﻿# Caches et fichiers inutiles
-__pycache__/
+﻿__pycache__/
 *.pyc
-*.pyo
-*.pyd
-*.log
-*.swp
-*.tmp
 *.ipynb
-
-# Dossiers de travail local
+*.log
+*.h5
 data/
 notebooks/
-outputs/
-checkpoints/
-tests/
-
-# Dossiers git
-.git/
-.github/
-
-# Modèles lourds ou temporaires
-*.h5
-*.ckpt
-
-# Exclut les modèles ailleurs que ceux nécessaires
-app/model/*.h5
-api/model/*.h5
-
-# Fichiers système
+.git
+.github
 .DS_Store
-Thumbs.db
