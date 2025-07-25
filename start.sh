@@ -13,6 +13,13 @@ else
   echo "Modèle déjà présent, pas de téléchargement."
 fi
 
-# Démarrer l'application fusionnée (FastAPI + Streamlit)
 echo "Démarrage de l'application fusionnée (FastAPI + Streamlit)..."
-exec python3 api/main.py
+
+# Lancer FastAPI sur le port 8000 en arrière-plan
+uvicorn api.main:app --host 0.0.0.0 --port 8000 &
+
+# Lancer Streamlit sur le port 80 en arrière-plan
+streamlit run app/app.py --server.port 80 --server.address 0.0.0.0 &
+
+# Attendre que les processus restent actifs
+wait

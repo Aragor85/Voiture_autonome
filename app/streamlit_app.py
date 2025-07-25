@@ -51,10 +51,11 @@ if uploaded_file:
 
     # Boucle de retry pour attendre l'API
     max_wait = 30
+    ext = uploaded_file.name.split('.')[-1].lower()
+    mime = 'image/png' if ext == 'png' else 'image/jpeg'
+
     for i in range(1, max_wait + 1):
-        ext = uploaded_file.name.split('.')[-1].lower()
-        mime = 'image/png' if ext == 'png' else 'image/jpeg'
-        files = {"file": (uploaded_file.name, img_bytes, mime)}
+        files = {"file": (uploaded_file.name, io.BytesIO(img_bytes), mime)}
         try:
             response = requests.post(
                 f"{API_URL}/predict/",
@@ -91,11 +92,13 @@ if uploaded_file:
         st.image(blended, caption="🎨 Masque superposé", use_container_width=True)
 
     # Boutons de téléchargement
-    buf_mask = io.BytesIO(); mask_img.save(buf_mask, format="PNG")
+    buf_mask = io.BytesIO()
+    mask_img.save(buf_mask, format="PNG")
     st.download_button("📥 Télécharger le masque", data=buf_mask.getvalue(),
                        file_name="mask.png", mime="image/png")
 
-    buf_blended = io.BytesIO(); blended.save(buf_blended, format="PNG")
+    buf_blended = io.BytesIO()
+    blended.save(buf_blended, format="PNG")
     st.download_button("📥 Télécharger l'image superposée", data=buf_blended.getvalue(),
                        file_name="blended.png", mime="image/png")
 
@@ -106,9 +109,9 @@ if uploaded_file:
         r, g, b = cityscapes_palette[i]
         hex_color = f'#{r:02x}{g:02x}{b:02x}'
         legend_html += (
-          f"<div style='display:inline-block; margin:4px;'>"
-          f"<div style='width:20px;height:20px;background-color:{hex_color};"
-          f"display:inline-block;vertical-align:middle;margin-right:8px;'></div>"
-          f"{label}</div><br>"
+            f"<div style='display:inline-block; margin:4px;'>"
+            f"<div style='width:20px;height:20px;background-color:{hex_color};"
+            f"display:inline-block;vertical-align:middle;margin-right:8px;'></div>"
+            f"{label}</div><br>"
         )
     st.markdown(legend_html, unsafe_allow_html=True)
