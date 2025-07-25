@@ -2,7 +2,6 @@
 *.pyc
 *.ipynb
 *.log
-*.h5
 data/
 notebooks/
 .git
