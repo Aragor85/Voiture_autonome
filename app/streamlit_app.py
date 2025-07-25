@@ -72,7 +72,7 @@ if uploaded_file:
 
     # Traitement du résultat
     try:
-        pred_array = np.array(response.json()["prediction"], dtype=np.uint8)
+        pred_array = np.array(response.json()["mask"], dtype=np.uint8)
     except Exception as e:
         st.error(f"Réponse API invalide : {e}")
         st.stop()
