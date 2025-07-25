@@ -27,6 +27,10 @@ MODEL_PATH = os.path.abspath(MODEL_PATH)
 print(f"[DEBUG] MODEL_PATH = {MODEL_PATH}")
 print(f"[DEBUG] Exists? {os.path.isfile(MODEL_PATH)}")
 
+# Taille du fichier modèle (debug)
+size = os.path.getsize(MODEL_PATH) if os.path.isfile(MODEL_PATH) else 0
+print(f"[DEBUG] Size of model file: {size} bytes")
+
 # ✅ Dictionnaire de custom_objects
 CUSTOM_OBJECTS = {
     "dice_metric": dice_metric,
