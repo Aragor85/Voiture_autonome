@@ -11,41 +11,45 @@ env:
   ACR_LOGIN_SERVER: voitureautonome.azurecr.io
   IMAGE_NAME: segmentation-urbaine-app
   WEBAPP_NAME: segmentation-urbaine
-  DOCKER_BUILDKIT: 0
+  DOCKER_BUILDKIT: 1
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 1) Récupère le code source
+      # 1) Récupère le code
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2) Connexion à Azure
+      # 2) Auth Azure via SPN
       - name: Azure Login
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # 3) Connexion à ACR
+      # 3) Auth à l’ACR
       - name: Azure Container Registry Login
         run: az acr login --name ${{ env.ACR_NAME }}
 
-      # 4) Nettoyage du cache Docker
-      - name: Docker cache cleanup
-        run: docker builder prune -f
-
-      # 5) Build & push image
-      - name: Build, tag and push image (no-cache)
+      # ✅ Étape debug : afficher les fichiers présents
+      - name: List project files (debug)
         run: |
-          docker build --no-cache \
+          echo "::group::Project Tree"
+          sudo apt-get update && sudo apt-get install tree -y
+          tree -a -L 3
+          echo "::endgroup::"
+
+      # 4) Build & push avec Docker
+      - name: Build, tag and push image
+        run: |
+          docker build \
             --file ./Dockerfile \
             --tag ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest \
             .
           docker push ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest
 
-      # 6) Déploiement sur Azure Web App via ACR
+      # 5) Déployer sur Azure App Service
       - name: Deploy to Azure Web App (via ACR)
         uses: azure/webapps-deploy@v3
         with:
