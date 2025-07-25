@@ -1,46 +1,19 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException
+import threading
+import uvicorn
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import io
-from PIL import Image, UnidentifiedImageError
-from api.model_utils import load_model_and_predict
+from api.main import app as fastapi_app
+import streamlit.web.bootstrap
+import os
 
-app = FastAPI(
-    title="Segmentation Urbaine API",
-    description="Endpoint de prédiction de masque pour Cityscapes",
-)
+def run_fastapi():
+    uvicorn.run(fastapi_app, host="0.0.0.0", port=8000)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+def run_streamlit():
+    # Utilise le même script Streamlit que d’habitude
+    streamlit_args = ["streamlit_app.py", "--server.port=80", "--server.address=0.0.0.0"]
+    streamlit.web.bootstrap.run(streamlit_args)
 
-@app.get("/")
-async def root():
-    return {"message": "API Segmentation Urbaine - En ligne"}
-
-@app.get("/health")
-async def health_check():
-    return {"status": "ok"}
-
-@app.post("/predict/")
-async def predict_mask(file: UploadFile = File(...)):
-    contents = await file.read()
-    if not contents:
-        raise HTTPException(status_code=400, detail="Fichier vide")
-
-    try:
-        img = Image.open(io.BytesIO(contents))
-        img.verify()
-    except UnidentifiedImageError:
-        raise HTTPException(status_code=415, detail="Le fichier envoyé n'est pas une image valide")
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Erreur lors de la lecture de l'image : {e}")
-
-    try:
-        mask = load_model_and_predict(contents)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur interne lors de la prédiction : {e}")
-
-    return {"prediction": mask.tolist()}
+if __name__ == "__main__":
+    threading.Thread(target=run_fastapi, daemon=True).start()
+    run_streamlit()
