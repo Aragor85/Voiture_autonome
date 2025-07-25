@@ -18,4 +18,4 @@ uvicorn api.main:app --host 0.0.0.0 --port 8000 &
 # Azure définit la variable d'environnement PORT automatiquement
 PORT=${PORT:-8080}
 echo "Démarrage de Streamlit sur le port $PORT..."
-streamlit run app/streamlit_app.py --server.port 8080
+streamlit run app/streamlit_app.py --server.port $PORT --server.address 0.0.0.0
