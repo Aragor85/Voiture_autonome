@@ -14,8 +14,6 @@ RUN mkdir -p ./api/model
 
 RUN chmod +x start.sh
 
-ENV MODEL_PATH=/app/api/model/unet_vgg16_best.h5
-
 EXPOSE 8000
 
 CMD ["./start.sh"]
