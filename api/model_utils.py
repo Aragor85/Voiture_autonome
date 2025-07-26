@@ -1,9 +1,9 @@
+import os
 import requests
 from tensorflow.keras.models import load_model
-import os
 
 MODEL_URL = "https://modelevgg16unetstorage.blob.core.windows.net/modelevgg16unetstorage/unet_vgg16_best.h5"
-LOCAL_MODEL_PATH = "/app/model/unet_vgg16_best.h5"  # ou un chemin adapté dans le conteneur
+LOCAL_MODEL_PATH = "/app/model/unet_vgg16_best.h5"
 
 def download_model():
     if not os.path.exists(LOCAL_MODEL_PATH):
@@ -19,4 +19,4 @@ def download_model():
 
 def load_model_from_url():
     download_model()
-    return load_model(LOCAL_MODEL_PATH)
+    return load_model(LOCAL_MODEL_PATH, compile=False)
