@@ -1,17 +1,20 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from api.model_utils import load_model_from_url
 from PIL import Image
 import io
 import numpy as np
+import tensorflow as tf
+import os
 import base64
+import requests
 
-app = FastAPI(
-    title="Segmentation Urbaine API",
-    description="Charge un modèle depuis une URL et renvoie un masque PNG encodé en Base64"
-)
+MODEL_URL = "https://modelevgg16unetstorage.blob.core.windows.net/modelevgg16unetstorage/unet_vgg16_best.h5"
+MODEL_PATH = "/app/model/unet_vgg16_best.h5"
 
-# CORS ouvert pour tester (à restreindre en prod)
+# FastAPI instance
+app = FastAPI()
+
+# CORS pour permettre l'accès depuis le frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -20,50 +23,69 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Chargement unique du modèle au démarrage
-model = load_model_from_url()
+# Téléchargement du modèle si non présent
+def download_model():
+    if not os.path.exists(MODEL_PATH):
+        print("📥 Téléchargement du modèle...")
+        os.makedirs(os.path.dirname(MODEL_PATH), exist_ok=True)
+        response = requests.get(MODEL_URL)
+        with open(MODEL_PATH, "wb") as f:
+            f.write(response.content)
+        print("✅ Modèle téléchargé.")
+    else:
+        print("✅ Modèle déjà présent.")
 
+# Chargement robuste du modèle
+def load_model_safely():
+    if not os.path.exists(MODEL_PATH):
+        raise FileNotFoundError(f"Modèle introuvable à : {MODEL_PATH}")
+    try:
+        model = tf.keras.models.load_model(MODEL_PATH, compile=False)
+        print("✅ Modèle chargé avec succès.")
+        return model
+    except Exception as e:
+        raise RuntimeError(f"❌ Erreur lors du chargement du modèle : {e}")
+
+# Chargement au démarrage
+download_model()
+model = load_model_safely()
+
+# Prétraitement image (resize + normalisation)
 def preprocess_image(image: Image.Image) -> np.ndarray:
-    """Resize + normalisation pour inference."""
     image = image.resize((224, 224))
-    arr = np.array(image).astype("float32") / 255.0
-    return np.expand_dims(arr, axis=0)  # shape (1,224,224,3)
+    array = np.array(image).astype("float32") / 255.0
+    return np.expand_dims(array, axis=0)  # (1, 224, 224, 3)
 
+# Conversion masque en base64 PNG
 def mask_to_base64(mask: np.ndarray) -> str:
-    """
-    Convertit un masque 2D uint8 en image PNG base64.
-    Toutes les valeurs de mask sont interprétées comme niveaux de gris.
-    """
-    pil = Image.fromarray(mask, mode="L")
+    img = Image.fromarray(mask.astype(np.uint8))
     buf = io.BytesIO()
-    pil.save(buf, format="PNG")
-    return base64.b64encode(buf.getvalue()).decode("ascii")
+    img.save(buf, format="PNG")
+    return base64.b64encode(buf.getvalue()).decode("utf-8")
 
+# Endpoints
 @app.get("/")
 async def root():
-    return {"message": "API Segmentation Urbaine OK"}
+    return {"message": "✅ API segmentation urbaine opérationnelle"}
 
 @app.post("/predict/")
 async def predict_segmentation(file: UploadFile = File(...)):
-    # Vérifier le type MIME
     if not file.content_type.startswith("image/"):
-        raise HTTPException(400, "Le fichier doit être une image")
+        raise HTTPException(status_code=400, detail="Le fichier doit être une image")
 
-    data = await file.read()
+    contents = await file.read()
     try:
-        img = Image.open(io.BytesIO(data)).convert("RGB")
+        image = Image.open(io.BytesIO(contents)).convert("RGB")
     except Exception:
-        raise HTTPException(400, "Impossible de décoder l'image")
+        raise HTTPException(status_code=400, detail="❌ Erreur lors du traitement de l'image")
 
-    x = preprocess_image(img)
-    preds = model.predict(x)  # shape (1,224,224,num_classes)
-    mask = np.argmax(preds[0], axis=-1).astype(np.uint8)  # (224,224)
-
-    b64 = mask_to_base64(mask)
-    h, w = mask.shape
+    input_data = preprocess_image(image)
+    prediction = model.predict(input_data)
+    mask = np.argmax(prediction.squeeze(), axis=-1).astype(np.uint8)
+    mask_base64 = mask_to_base64(mask)
 
     return {
-        "mask_base64": b64,
-        "width": w,
-        "height": h
+        "mask_base64": mask_base64,
+        "width": mask.shape[1],
+        "height": mask.shape[0]
     }
