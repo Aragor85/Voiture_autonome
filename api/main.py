@@ -5,9 +5,11 @@ from PIL import Image
 import io
 import numpy as np
 import tensorflow as tf
+import base64
 
 app = FastAPI()
 
+# Autoriser les requêtes depuis n'importe quelle origine
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -22,9 +24,16 @@ model = load_model_from_url()
 # Fonction de prétraitement simple (resize + normalisation)
 def preprocess_image(image: Image.Image) -> np.ndarray:
     image = image.resize((224, 224))
-    img_array = np.array(image).astype("float32") / 255.0  # Normalisation
-    img_array = np.expand_dims(img_array, axis=0)  # Shape (1, 224, 224, 3)
+    img_array = np.array(image).astype("float32") / 255.0
+    img_array = np.expand_dims(img_array, axis=0)
     return img_array
+
+# Convertir le masque (np.ndarray) en image PNG encodée base64
+def mask_to_base64(mask: np.ndarray) -> str:
+    mask_img = Image.fromarray(mask.astype(np.uint8))  # Niveaux de gris
+    buffered = io.BytesIO()
+    mask_img.save(buffered, format="PNG")
+    return base64.b64encode(buffered.getvalue()).decode("utf-8")
 
 @app.get("/")
 async def root():
@@ -42,7 +51,13 @@ async def predict_segmentation(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="Erreur lors du traitement de l'image")
 
     input_data = preprocess_image(image)
-    prediction = model.predict(input_data)  # Shape: (1, 224, 224, num_classes)
-    mask = np.argmax(prediction.squeeze(), axis=-1).astype(np.uint8)  # Shape: (224, 224)
+    prediction = model.predict(input_data)
+    mask = np.argmax(prediction.squeeze(), axis=-1).astype(np.uint8)
 
-    return {"prediction": mask.tolist()}
+    mask_base64 = mask_to_base64(mask)
+
+    return {
+        "mask_base64": mask_base64,
+        "width": mask.shape[1],
+        "height": mask.shape[0]
+    }
