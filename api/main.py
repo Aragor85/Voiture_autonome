@@ -4,12 +4,14 @@ from api.model_utils import load_model_from_url
 from PIL import Image
 import io
 import numpy as np
-import tensorflow as tf
 import base64
 
-app = FastAPI()
+app = FastAPI(
+    title="Segmentation Urbaine API",
+    description="Charge un modèle depuis une URL et renvoie un masque PNG encodé en Base64"
+)
 
-# Autoriser les requêtes depuis n'importe quelle origine
+# CORS ouvert pour tester (à restreindre en prod)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -18,46 +20,50 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Charger le modèle une fois au démarrage
+# Chargement unique du modèle au démarrage
 model = load_model_from_url()
 
-# Fonction de prétraitement simple (resize + normalisation)
 def preprocess_image(image: Image.Image) -> np.ndarray:
+    """Resize + normalisation pour inference."""
     image = image.resize((224, 224))
-    img_array = np.array(image).astype("float32") / 255.0
-    img_array = np.expand_dims(img_array, axis=0)
-    return img_array
+    arr = np.array(image).astype("float32") / 255.0
+    return np.expand_dims(arr, axis=0)  # shape (1,224,224,3)
 
-# Convertir le masque (np.ndarray) en image PNG encodée base64
 def mask_to_base64(mask: np.ndarray) -> str:
-    mask_img = Image.fromarray(mask.astype(np.uint8))  # Niveaux de gris
-    buffered = io.BytesIO()
-    mask_img.save(buffered, format="PNG")
-    return base64.b64encode(buffered.getvalue()).decode("utf-8")
+    """
+    Convertit un masque 2D uint8 en image PNG base64.
+    Toutes les valeurs de mask sont interprétées comme niveaux de gris.
+    """
+    pil = Image.fromarray(mask, mode="L")
+    buf = io.BytesIO()
+    pil.save(buf, format="PNG")
+    return base64.b64encode(buf.getvalue()).decode("ascii")
 
 @app.get("/")
 async def root():
-    return {"message": "API segmentation urbaine active"}
+    return {"message": "API Segmentation Urbaine OK"}
 
 @app.post("/predict/")
 async def predict_segmentation(file: UploadFile = File(...)):
+    # Vérifier le type MIME
     if not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="Le fichier doit être une image")
+        raise HTTPException(400, "Le fichier doit être une image")
 
-    contents = await file.read()
+    data = await file.read()
     try:
-        image = Image.open(io.BytesIO(contents)).convert("RGB")
+        img = Image.open(io.BytesIO(data)).convert("RGB")
     except Exception:
-        raise HTTPException(status_code=400, detail="Erreur lors du traitement de l'image")
+        raise HTTPException(400, "Impossible de décoder l'image")
 
-    input_data = preprocess_image(image)
-    prediction = model.predict(input_data)
-    mask = np.argmax(prediction.squeeze(), axis=-1).astype(np.uint8)
+    x = preprocess_image(img)
+    preds = model.predict(x)  # shape (1,224,224,num_classes)
+    mask = np.argmax(preds[0], axis=-1).astype(np.uint8)  # (224,224)
 
-    mask_base64 = mask_to_base64(mask)
+    b64 = mask_to_base64(mask)
+    h, w = mask.shape
 
     return {
-        "mask_base64": mask_base64,
-        "width": mask.shape[1],
-        "height": mask.shape[0]
+        "mask_base64": b64,
+        "width": w,
+        "height": h
     }
