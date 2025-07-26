@@ -2,14 +2,13 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# Installer curl
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
-
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+RUN chmod +x start.sh
 EXPOSE 8080
 
-CMD ["streamlit", "run", "app/streamlit_app.py", "--server.port=8080", "--server.address=0.0.0.0"]
+CMD ["./start.sh"]
