@@ -12,10 +12,5 @@ else
   echo "Modèle déjà présent, pas de téléchargement."
 fi
 
-echo "Démarrage de FastAPI en arrière-plan..."
-uvicorn api.main:app --host 0.0.0.0 --port 8000 &
-
-# Azure définit la variable d'environnement PORT automatiquement
-PORT=${PORT:-8080}
-echo "Démarrage de Streamlit sur le port $PORT..."
-streamlit run app/streamlit_app.py --server.port $PORT --server.address 0.0.0.0
+echo "Démarrage de l'application combinée FastAPI + Streamlit"
+python start_app.py
