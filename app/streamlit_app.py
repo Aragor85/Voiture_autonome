@@ -1,13 +1,24 @@
 import os
-import streamlit as st
-from PIL import Image
+import io
+import time
+import base64
+import threading
 import numpy as np
 import requests
-import io
-import base64
-import time
+from PIL import Image
+import streamlit as st
 
-# ✅ Palette Cityscapes groupée (8 classes)
+# === FastAPI backend intégré ===
+from fastapi import FastAPI, File, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+import uvicorn
+from tensorflow.keras.models import load_model
+
+# === Constants ===
+MODEL_URL = "https://modelevgg16unetstorage.blob.core.windows.net/modelevgg16unetstorage/unet_vgg16_best.h5"
+MODEL_PATH = "/app/api/model/unet_vgg16_best.h5"
+
+# === Cityscapes Palette ===
 cityscapes_palette = [
     (128, 64, 128),   # 0 - flat
     (220, 20, 60),    # 1 - human
@@ -18,27 +29,70 @@ cityscapes_palette = [
     (70, 130, 180),   # 6 - sky
     (0, 0, 0),        # 7 - void
 ]
-
 cityscapes_labels = [
     "Flat (route/trottoir)", "Humain", "Véhicule", "Construction",
     "Objet", "Nature", "Ciel", "Void"
 ]
 
-def overlay_mask(image_pil, mask_pil, alpha=0.5):
-    image = image_pil.convert("RGBA")
-    mask = mask_pil.convert("RGBA")
-    if image.size != mask.size:
-        mask = mask.resize(image.size)
-    return Image.blend(image, mask, alpha=alpha)
+# === Téléchargement modèle si absent ===
+os.makedirs(os.path.dirname(MODEL_PATH), exist_ok=True)
+if not os.path.exists(MODEL_PATH):
+    print("Téléchargement du modèle...")
+    r = requests.get(MODEL_URL)
+    r.raise_for_status()
+    with open(MODEL_PATH, "wb") as f:
+        f.write(r.content)
+    print("Modèle téléchargé.")
+else:
+    print("Modèle déjà présent.")
 
+# === Chargement modèle sans compilation ===
+model = load_model(MODEL_PATH, compile=False)
+
+# === Backend FastAPI ===
+app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], allow_credentials=True,
+    allow_methods=["*"], allow_headers=["*"]
+)
+
+def preprocess_image(image: Image.Image) -> np.ndarray:
+    image = image.resize((224, 224))
+    img_array = np.array(image).astype("float32") / 255.0
+    return np.expand_dims(img_array, axis=0)
+
+def mask_to_base64(mask: np.ndarray) -> str:
+    mask_img = Image.fromarray(mask.astype(np.uint8))
+    buffered = io.BytesIO()
+    mask_img.save(buffered, format="PNG")
+    return base64.b64encode(buffered.getvalue()).decode("utf-8")
+
+@app.post("/predict/")
+async def predict_segmentation(file: UploadFile = File(...)):
+    contents = await file.read()
+    image = Image.open(io.BytesIO(contents)).convert("RGB")
+    input_data = preprocess_image(image)
+    prediction = model.predict(input_data)
+    mask = np.argmax(prediction.squeeze(), axis=-1).astype(np.uint8)
+    return {
+        "mask_base64": mask_to_base64(mask),
+        "width": mask.shape[1],
+        "height": mask.shape[0]
+    }
+
+# === Lancer FastAPI en thread ===
+def start_fastapi():
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+threading.Thread(target=start_fastapi, daemon=True).start()
+time.sleep(3)  # Temps pour que l’API démarre
+
+# === FRONT Streamlit ===
 st.set_page_config(layout="wide")
-st.title("🚘 FUTURE VISION TRANSPORT - Segmentation Urbaine - Voiture Autonome")
+st.title("🚘 FUTURE VISION TRANSPORT - Segmentation Urbaine")
 
-API_URL = os.getenv("API_URL", "http://localhost:8000")
-uploaded_file = st.file_uploader("📤 Téléversez une image (jpg/png)", type=["jpg", "png", "jpeg"])
-
+uploaded_file = st.file_uploader("📤 Téléversez une image (jpg/png)", type=["jpg", "jpeg", "png"])
 if uploaded_file:
-    # Lecture de l'image utilisateur
     uploaded_file.seek(0)
     img_bytes = uploaded_file.read()
 
@@ -46,74 +100,64 @@ if uploaded_file:
         image = Image.open(io.BytesIO(img_bytes)).convert("RGB")
         st.image(image, caption="🖼️ Image importée", use_container_width=True)
     except Exception as e:
-        st.error(f"Erreur lors de la lecture de l'image : {e}")
+        st.error(f"Erreur de lecture de l’image : {e}")
         st.stop()
 
-    # Envoi à l'API FastAPI (retry max 300s)
-    max_wait = 300
-    ext = uploaded_file.name.split('.')[-1].lower()
-    mime = 'image/png' if ext == 'png' else 'image/jpeg'
-
-    for i in range(1, max_wait + 1):
+    # Appel API FastAPI (locale)
+    for i in range(300):
         try:
-            files = {"file": (uploaded_file.name, io.BytesIO(img_bytes), mime)}
-            response = requests.post(f"{API_URL}/predict/", files=files, timeout=10)
+            files = {"file": (uploaded_file.name, io.BytesIO(img_bytes), uploaded_file.type)}
+            response = requests.post("http://localhost:8000/predict/", files=files, timeout=10)
             response.raise_for_status()
             break
         except Exception:
             time.sleep(1)
     else:
-        st.error(f"❌ L’API n’a pas répondu après {max_wait} secondes.")
+        st.error("❌ L’API n’a pas répondu après 300 secondes.")
         st.stop()
 
-    # Traitement de la réponse base64
     try:
-        data = response.json()
-        mask_base64 = data["mask_base64"]
-        width = data.get("width", 224)
-        height = data.get("height", 224)
-        mask_bytes = base64.b64decode(mask_base64)
-        mask_img = Image.open(io.BytesIO(mask_bytes)).convert("L")
-        mask_array = np.array(mask_img)
+        result = response.json()
+        mask_data = base64.b64decode(result["mask_base64"])
+        width, height = result.get("width", 224), result.get("height", 224)
+        mask = Image.open(io.BytesIO(mask_data)).convert("L")
+        mask_np = np.array(mask)
     except Exception as e:
-        st.error(f"❌ Erreur lors de la lecture de la réponse API : {e}")
+        st.error(f"Erreur lecture réponse API : {e}")
         st.stop()
 
-    # Recoloration du masque en RGB selon la palette
-    color_mask = np.zeros((mask_array.shape[0], mask_array.shape[1], 3), dtype=np.uint8)
+    # Masque coloré
+    color_mask = np.zeros((height, width, 3), dtype=np.uint8)
     for class_id, color in enumerate(cityscapes_palette):
-        color_mask[mask_array == class_id] = color
-    mask_colored = Image.fromarray(color_mask)
+        color_mask[mask_np == class_id] = color
+    color_mask_img = Image.fromarray(color_mask)
 
-    image_resized = image.resize((mask_colored.width, mask_colored.height))
-    blended = overlay_mask(image_resized, mask_colored)
+    resized_img = image.resize((width, height))
+    blended = Image.blend(resized_img.convert("RGBA"), color_mask_img.convert("RGBA"), alpha=0.5)
 
     col1, col2 = st.columns(2)
     with col1:
-        st.image(image_resized, caption="🖼️ Image originale redimensionnée", use_container_width=True)
+        st.image(resized_img, caption="🖼️ Image redimensionnée", use_container_width=True)
     with col2:
         st.image(blended, caption="🎨 Masque superposé", use_container_width=True)
 
-    # Boutons de téléchargement
+    # Téléchargement
     buf_mask = io.BytesIO()
-    mask_colored.save(buf_mask, format="PNG")
-    st.download_button("📥 Télécharger le masque", data=buf_mask.getvalue(),
-                       file_name="mask.png", mime="image/png")
+    color_mask_img.save(buf_mask, format="PNG")
+    st.download_button("📥 Télécharger le masque", buf_mask.getvalue(), file_name="mask.png", mime="image/png")
 
-    buf_blended = io.BytesIO()
-    blended.save(buf_blended, format="PNG")
-    st.download_button("📥 Télécharger l'image superposée", data=buf_blended.getvalue(),
-                       file_name="blended.png", mime="image/png")
+    buf_blend = io.BytesIO()
+    blended.save(buf_blend, format="PNG")
+    st.download_button("📥 Télécharger l'image superposée", buf_blend.getvalue(), file_name="blended.png", mime="image/png")
 
-    # Légende des couleurs
+    # Légende
     st.markdown("### 🧭 Légende des classes")
     legend_html = ""
     for i, label in enumerate(cityscapes_labels):
         r, g, b = cityscapes_palette[i]
-        hex_color = f'#{r:02x}{g:02x}{b:02x}'
         legend_html += (
-            f"<div style='display:inline-block; margin:4px;'>"
-            f"<div style='width:20px;height:20px;background-color:{hex_color};"
+            f"<div style='display:inline-block;margin:4px;'>"
+            f"<div style='width:20px;height:20px;background-color:#{r:02x}{g:02x}{b:02x};"
             f"display:inline-block;vertical-align:middle;margin-right:8px;'></div>"
             f"{label}</div><br>"
         )
