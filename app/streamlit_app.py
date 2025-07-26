@@ -50,7 +50,7 @@ if uploaded_file:
         st.stop()
 
     # Boucle de retry pour attendre l'API
-    max_wait = 30
+    max_wait = 300
     ext = uploaded_file.name.split('.')[-1].lower()
     mime = 'image/png' if ext == 'png' else 'image/jpeg'
 
