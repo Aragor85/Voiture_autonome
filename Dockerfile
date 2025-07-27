@@ -6,9 +6,9 @@ RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copie app/ et api/
+# Copie les dossiers nécessaires
 COPY app/ ./app/
-COPY api/model_utils.py ./app/  
+COPY api/ ./api/
 COPY start.sh .
 
 RUN chmod +x start.sh

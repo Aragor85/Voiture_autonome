@@ -3,7 +3,7 @@ fastapi==0.103.0
 uvicorn[standard]==0.23.2
 
 # Frontend Streamlit
-streamlit==1.25.0
+streamlit>=1.32.0
 
 # Deep Learning / Image
 tensorflow==2.16.1
