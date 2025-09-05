@@ -1,4 +1,4 @@
-## Rapport technique le 24 juillet 2025
+## Rapport technique le 29 juillet 2025
 
 # Segmentation d'Images pour pour le système embarqué d’une voiture autonome
 
@@ -89,14 +89,14 @@ Le dataset Cityscapes du projet offre de nombreux avantages pour l’entraîneme
 Selon la demande de Franck et pour garder une corrélation lors de la prise de décision. On  a utilisé le mapping des catégories suivant en gardant seulement 8 catégories principales : 
 
 class_groups = {
-'flat': ['road', 'sidewalk', 'parking', 'rail track'],
-'human': ['person', 'rider'],
-'vehicle': ['car', 'truck', 'bus', 'motorcycle', 'bicycle', ...],
-'construction': ['building', 'wall', 'fence', 'bridge', ...],
-'object': ['pole', 'traffic sign', 'traffic light', ...],
-'nature': ['vegetation', 'terrain'],
-'sky': ['sky'],
-'void': ['unlabeled', 'out of roi', ...]
+- 'flat': ['road', 'sidewalk', 'parking', 'rail track'],
+- 'human': ['person', 'rider'],
+- 'vehicle': ['car', 'truck', 'bus', 'motorcycle', 'bicycle', ...],
+- 'construction': ['building', 'wall', 'fence', 'bridge', ...],
+- 'object': ['pole', 'traffic sign', 'traffic light', ...],
+- 'nature': ['vegetation', 'terrain'],
+- 'sky': ['sky'],
+- 'void': ['unlabeled', 'out of roi', ...]
 }
 
 #### 1.2.3 Préparation des Données
@@ -122,14 +122,17 @@ Les données dans notre projet intégrent plusieurs étapes :
 ### 1.3 Architecture du Modèle : UNet-mini
 L’architecture **U-Net Mini** est une version simplifiée du modèle U-Net conçu pour la **segmentation sémantique d’images**. Elle suit une structure en **encodeur-décodeur symétrique** avec des **connexions par saut** (skip connections) entre les couches de même niveau. L’encodeur extrait les **caractéristiques spatiales** via des blocs de convolution suivis de **max pooling**, tandis que le décodeur reconstruit la carte de segmentation avec des **upsampling** (ou transposed convolutions). Moins profonde que l’U-Net original, elle est plus légère et adaptée aux contextes à **faibles ressources** ou temps réel. Malgré sa simplicité, elle reste efficace pour les tâches de segmentation basiques.
 
-images images images images
-
 - **Objectif** : Attribuer une classe à chaque pixel de l'image (segmentation).
+
+![exemple](images/Unet__def.png)
+
 
 
 #### Architecture U-Net Partie encodeur (descendante)
 
 L’encodeur extrait les **caractéristiques importantes** de l’image. Il est composé de **blocs de convolution + ReLU**, suivis de **MaxPooling** pour réduire progressivement la taille de l’image tout en capturant des **informations de plus haut niveau**. Chaque couche descendante réduit la résolution mais augmente la profondeur des canaux.
+
+
 
 #### Partie décodeur (ascendante)
 
@@ -138,18 +141,13 @@ Le décodeur reconstruit la **carte de segmentation** à partir des caractérist
 Ensemble, ces deux parties permettent de combiner **contexte global** et les **détails fins**.
 
 
-##### Construction, Entraînement du Modèle et Optimisation
-
 #### Paramètres
 
-🔹 Nombre total de paramètres : environ 850 000
-🔹 Le nombre de filtres double à chaque niveau de profondeur dans l’encodeur : 32 → 64 → 128
-🔹 Le décodeur réutilise les features de l’encodeur via des connexions de skip, et reconstruit l’image
-🔹 Tous les paramètres sont entraînables, car il n’y a pas de backbone pré-entraîné (tout est appris from scratch)
+- Nombre total de paramètres : environ 850 000
+- Le nombre de filtres double à chaque niveau de profondeur dans l’encodeur : 32 → 64 → 128
+- Le décodeur réutilise les features de l’encodeur via des connexions de skip, et reconstruit l’image
+- Tous les paramètres sont entraînables, car il n’y a pas de backbone pré-entraîné (tout est appris from scratch)
 	
-#### Analyse de l'entraînement du modèle
-
- Image  Image Image 
 
 ### 1.4 Architecture du Modèle : VGG16 + UNet-mini
 
@@ -160,6 +158,9 @@ Les **skip connections** permettent de réinjecter les détails spatiaux à chaq
 Le **bottleneck** (block5) représente l’information compressée et abstraite de l’image.
 Le décodeur reconstruit progressivement la **segmentation pixel par pixel** via des **Conv2DTranspose**.
 Une **couche finale softmax** prédit la probabilité de chaque classe pour chaque pixel.
+
+![exemple](images/VGG16_def.png)
+
 
 #### Architecture U-Net + VGG16 Partie encodeur (descendante)
 
@@ -192,13 +193,7 @@ Une couche finale **Conv2D(8, 1, softmax)** prédit **8 classes** de segmentatio
 	
 
 #### Analyse de l'entraînement du modèle
-```
-Code Python
-```
 
-```
-None
-```
 ### 1.5 Évaluation et Métriques
 
 #### 1.5.1 Métriques de Performance
@@ -206,49 +201,50 @@ None
 L'évaluation de modèles de segmentation nécessite des métriques spécialisées. Nous utilisons
 principalement :
 
-#### Accuracy
-
+#### Accuracy : 
 Mesure le pourcentage de pixels correctement classés. Peu fiable en cas de classes déséquilibrées.
 
-#### Dice
-
+#### Dice :
 Mesure le chevauchement entre les masques prédits et réels. Très adaptée pour évaluer la **qualité de la segmentation**.
 
-```
-```
-#### Total_loss ( Dice_loss + Crossentropy)
-
+#### Total_loss ( Dice_loss + Crossentropy) :
 Combine la **Dice loss** (sensibilité au chevauchement) et la **Cross Entropy** (erreurs de classification). Permet un **équilibre entre précision locale et globale**.
 
-#### IoU (Intersection over Union)
-
+#### IoU (Intersection over Union) :
 Évalue la qualité de la prédiction par classe (intersection / union). C’est une métrique **standard et recommandée pour la segmentation**.
-```
-```
+
 #### 1.5.2 Résultats   
 
-Il faut un tabelau comparatif  Accuracy,DICE,Total_loss,IoU 
-
-#### Graphiques  
+#### Graphiques et exemples de visualisations  
 ##### Unet-mini
+
 ![Unet-mini](images/Unet_Accuracy-Total_Loss.png)
-
-##### VGG16+Unet
-![VGG16_Unet-mini](images/VGG16_Accuracy_Total-loss.png)
-
-#### Exemples de visualisation des prédictions
-##### Unet-mini
 ![Unet-mini](images/Unet_exemples_prédictions.png)
 
 ##### VGG16+Unet
+
+![VGG16_Unet-mini](images/VGG16_Accuracy_Total-loss.png)
 ![VGG16_Unet-mini](images/VGG16_exemples_prédictions.png)
 
+##### VGG16+Unet sans data augmentation
 
-#### X.X.X Analyse des Performances de l'architecture retenue ( Unet+VGG16) 
+![VGG16_Unet-mini](images/VGG16_Sans-data-augm_Accuracy-Total_Loss.png)
+![VGG16_Unet-mini](images/VGG16_exemples_prédictions_sans_data.png)
 
 
+#### X.X.X Analyse des Performances 
 
-##### IoU (Intersection over Union)
+![Tableau de comparaison](images/Comparaison_archi.png)
+
+- **Le modèle Unet‑mini** est ultra‑léger et rapide (~1 h 30) mais plafonne à 80 % d’accuracy, avec un loss de 0.88
+
+- **U‑Net + VGG16** (1 h 45) atteint près de 88 % d’accuracy et 0.85 de Dice, doublant la performance du Unet‑mini.
+- **L’augmentation des données** stabilise et renforce légèrement la généralisation, sans sur‑apprentissage notable.
+
+- **Le backbone VGG16 pré‑entraîné** donne une robustesse et limite le besoin en réglages
+
+- la version **U‑Net + VGG16** avec data augmentation est choisi pour le **déploiement sur le cloud**, afin de garder une sécurité en ce qui concerne la  variabilité du terrain
+
 
 Intersection over Union (IoU) par classe pour le modéle retenue :
 
@@ -272,21 +268,20 @@ Intersection over Union (IoU) par classe pour le modéle retenue :
 - **Détection des objets fins** (Object)
 - **Segmentation des humains** (Human)
 - **Besoin d'optimisation pour les petits objets,confusion avec les personnes**
-Voici le paragraphe que vous pouvez ajouter à votre documentation technique :
-
 
 
 #### 1.5.4 Impact de l'augmentation des données
 
--
--
--
--
--
--
-## 2. Développement et déploiement de l'application "  " 
+- L'impact de la data augmentation n'offre pas une meilleure performance donc il n'apporte pas de valeurs ajoutée
+- Pas de sur-apprentissage, l'Accuracy reste stable avec et sans augmentation de données
 
-### 2.1. Développement de l'application-web "  "
+## 2. Développement et déploiement de l'application
+
+Le workflow de déploiement est réalisé en 3 phases voir photo ci-dessous :
+
+!["worflow de déploiement](images/workflow.png)
+
+### 2.1. Développement de l'application-web
 
 ### 2.1.1 Backend (FastAPI) 
 
@@ -294,8 +289,9 @@ L'interface communique avec l' **API FastAPI** de ségmentation sémantique d'im
 
 - **Endpoint** : POST /predict pour l'analyse d'images
 - **Format** : Multipart/form-data pour l'upload de fichiers
-- **Réponse** : JSON contenant les images encodées et statistiques
-Cette architecture **facilite la maintenance** et permet une **évolution future** vers des fonctionnalités
+- **Réponse** : JSON contenant les images encodées
+
+!["FastAPI](images/FastAPI.png)
 
 
 ### 2.1.2 frontend (Streamlit) 
@@ -310,22 +306,16 @@ L'application Streamlit sert d’interface visuelle avec le modèle de segmentat
 - **Légende** affichant la signification de chaque classe prédite 
  Cette interface favorise la validation utilisateur et peut être déployée sur le cloud ou localement.
  
- ![Stramlit_app](images/Local_Streamlit_App.png)
- ![Stramlit_app](images/Legende_Streamlit.png)
-
+ ![Stramlit_app](images/Streamlit_App.png)
+ 
 	
 ### 2.2. Déploiement de l'application-web
-
-- Suivre le même parcours que blob projet 7
  
-### 2.2.1 Pipeloine de dépliement continu
-
 Pour automatiser le déploiement de notre modèle, nous avons mis en place un **pipeline CI/CD (Intégration Continue / Déploiement Continu)** avec les composants suivants :
 
 1. **Versionnement du code** : utilisation de Git pour le contrôle de version
 2. **GitHub Actions** : automatisation des tests et du déploiement à chaque push sur la branche (analyse_sentiments)
-3. **Déploiement sur Azure** : plateforme Cloud pour héberger notre API de prédiction de sentiments
-
+3. **Déploiement sur Azure** : plateforme Cloud pour héberger notre API de segmentation urbaine
 
 ### GitHub Actions 
 
@@ -333,44 +323,45 @@ Le déploiement est entièrement automatisé grâce à **GitHub Actions** :
 
 1. **Déclenchement** : À chaque commit/push sur la branche(segmentation), GitHub Actions lance le workflow.
 2. **Tests automatisés** : Le workflow exécute tous les tests unitaires.
-3. **Déploiement conditionnel** : Uniquement si les tests réussissent, l'application est déployée automatiquement sur Azure .[Test API ](https://xxxxxxxxxxxxxxxxxxx.azurewebsites.net/)
+3. **Déploiement conditionnel** : Uniquement si les tests réussissent, l'application est déployée automatiquement sur Azure .[Test API ](https://segmentation-urbaine.azurewebsites.net/)
 
 
 
 #### Création du workflow GitHub Actions
 
-Pour la création du workflow GitHub Actions, nous créons un fichier `.github/workflows/xxxxxxxxxxxxxxxxxxx.yml`
+
+Pour le réaliser, nous créons un fichier `.github/workflows/voiture-autonome_segmentation-urbaine.yml`
 
 #### Configuration des secrets GitHub
 
 Le workflow **GitHub Actions** a besoin d'accéder aux **variables d'environnement**. Nous avons donc renseigner les "secrets" nécessaires. Dans notre dépôt GitHub, nous allons dans "Settings" > "Secrets and variables" > "Actions", puis nous cliquons sur "New repository secret". Nous ajoutons les secrets suivants:
 
-!["New repository secret" dans Github](images/xxxxxxxxxxxxxxxxxxx.png)
+!["GitHub Actions" dans Github](images/GitHub.png)
 
 
 ### Déploiement sur Azure
 
 Pour le déploiement de notre solution, nous avons choisi [Azure](https://azure.microsoft.com/) pour plusieurs raisons :
 
-1. **Plan B1** : xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+1. **Plan B1** : Plan de service de base 
 2. **Intégration avec GitHub** : facilite le déploiement continu avec GitHub Actions
 3. **Scalabilité** : possibilité d'évoluer si le projet est approuvé pour la production
+
+![Interface Azure](images/interface_azure.png)
 
 #### Configuration Azure
 
 Notre application utilise les fichiers de configuration suivants pour Azure :
 
-- **Procfile** : `gunicorn app.main:app --workers 1 --worker-class uvicorn.workers.UvicornWorker --bind=0.0.0.0:8000` xxxxxxxxxxxxxxxxxxx
-- **runtime.txt** : `xxxxxxxxxxxxxxxxxxx`
+- **Dockerfile**
+- **start.sh**
 - **requirements.txt** : Liste de toutes les dépendances nécessaires
-
-Les variables d'environnement sur Azure incluent :
-
-- `INSTRUMENTATION_KEY` : Clé pour Azure voir xxxxxxx.yml
 
 #### Docker **Il faut parler 
 
-pour déployer une interface utilisateur Streamlit et tout le projet sur Azure :
+Le Dockerfile construit une image contenant FastAPI, Streamlit et les dépendances nécessaires. Au démarrage, le script start.sh télécharge le modèle unet_vgg16_best.h5 depuis Azure Blob Storage.
+
+!["Docker](images/docker.png)
 
 - **Isolation & portabilité** : un conteneur regroupe toute l'application (FastAPI + Streamlit + dépendances) dans un environnement cohérent et réutilisable.
 
@@ -386,15 +377,34 @@ pour déployer une interface utilisateur Streamlit et tout le projet sur Azure :
 
 ### Exemple d'exécution et déploiement réussis
 
-La capture d'écran suivante indique que le déploiement est réussi sur **Azure**.
 
-![GitHub Actions](images/Github_Build.png)
-![GitHub Actions](images/Github_deployment.png)
+La vidéo de démonstartion suivante indique que le déploiement est réussi sur **Azure**.
 
-![webapp](images/URL.png)
+[🎬 Voir la vidéo de démonstration](https://drive.google.com/file/d/1emriX90TvYEk3OCLZuOroHglAPwQ9T7S/view?usp=drive_link)
 
 
+## Pistes d'Amélioration 
+ **Modélisation** : 
+**Modélisation** : 
+Augmenter le volume de données ( météo, saisons et éclairage jour/nuit) ou bien utiliser d’autres base de données comme ( Mapillary Vistas , BDD100K,..)
+Remplacer VGG16 par des architectures plus modernes tel que Resnet50
 
-## Conclusion Gle et pistes d'Amélioration 
+Utilisation du module **CBAM** (Convolutional Block Attention Module) pour mettre en évidence les informations importantes dans les images et améliorer la détection des petits objets :
+ Le Channel Attention sélectionne les canaux les plus utiles via pooling et MLP, apprenant ainsi quoi   regarder(ex.routes,piétons).
+ Le Spatial Attention applique une carte de focus par convolution pour mettre en avant les zones clés de l’image, décidant où regarder.
+
+**Déploiement** :
+Pour les modèles d’entrainement lourd. Une optimisation de l’image Docker (dépendances) réduirait la taille et facilite le choix d’abonnement Cloud plus économique
+
  
-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+## Conclusion Générle 
+
+Ce projet a pour objectif en tant qu’ ingenieur data science de développer un module de segmentation d’images pour identifier le 8 classes demandés ( voiture, humains,végétation,…)  et l’intégrer dans la chaine de production
+
+Une phase initiale de prétraitement des données pour entrainer les architectures de type U-net a permis de sélectionné le meilleur model (Unet+VGG16) avec des métriques acceptables ( total_loss=0.55 ; Dice=0.85 ; Acccuracy =0.87)
+
+Une fois le modèle validé, il a été implanter dans une API, déployer dans le cloud avec le pipeline CI/CD de GitHub Actions et documenter dans une note technique pour destinée a l’équipe projet    
+
+Pour les perspectives, plusieurs optimisations sont possibles : enrichir le dataset avec des conditions variées, adopter des architectures plus modernes comme ResNet50, ou encore intégrer des modules d’attention comme CBAM pour améliorer la détection des petits objets.
+
+Cette solution illustre le potentiel de l’IA dans les systèmes embarques des voitures autonomes de la modélisation (prédictions) jusqu’au déploiement 
